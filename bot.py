@@ -7,25 +7,33 @@ from datetime import datetime
 TOKEN = os.environ["TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
-symbols = [
-"BTCUSDT",
-"ETHUSDT",
-"SOLUSDT",
-"BNBUSDT",
-"XRPUSDT",
-"ADAUSDT",
-"AVAXUSDT",
-"DOGEUSDT",
-"LINKUSDT",
-"TONUSDT"
-]
 
 def send_message(text):
+
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+
     requests.post(url,data={
         "chat_id":CHAT_ID,
         "text":text
     })
+
+
+def get_symbols():
+
+    url="https://api.binance.com/api/v3/exchangeInfo"
+
+    data=requests.get(url).json()
+
+    symbols=[]
+
+    for s in data["symbols"]:
+
+        if s["quoteAsset"]=="USDT" and s["status"]=="TRADING":
+
+            symbols.append(s["symbol"])
+
+    return symbols
+
 
 def get_rsi(symbol):
 
@@ -51,39 +59,49 @@ def get_rsi(symbol):
 
     return rsi.iloc[-2]
 
-def check():
+
+def scan():
+
+    symbols=get_symbols()
+
+    oversold=[]
+    overbought=[]
 
     for symbol in symbols:
 
-        rsi=get_rsi(symbol)
+        try:
 
-        if rsi>=70:
+            rsi=get_rsi(symbol)
 
-            send_message(
-f"""🚨 RSI сигнал
+            if rsi<=30:
 
-{symbol}
-TF 1H
+                oversold.append(f"{symbol} ({round(rsi,1)})")
 
-RSI {round(rsi,2)}
+            if rsi>=70:
 
-Перекупленность
-Сигнал по закрытию свечи"""
-)
+                overbought.append(f"{symbol} ({round(rsi,1)})")
 
-        if rsi<=30:
+        except:
 
-            send_message(
-f"""🚨 RSI сигнал
+            pass
 
-{symbol}
-TF 1H
 
-RSI {round(rsi,2)}
+    message="📊 RSI сканер рынка\n\n"
 
-Перепроданность
-Сигнал по закрытию свечи"""
-)
+    if oversold:
+
+        message+="🔵 Перепроданность\n"
+        message+="\n".join(oversold[:20])
+        message+="\n\n"
+
+    if overbought:
+
+        message+="🔴 Перекупленность\n"
+        message+="\n".join(overbought[:20])
+
+
+    send_message(message)
+
 
 while True:
 
@@ -91,7 +109,7 @@ while True:
 
     if now.minute==0:
 
-        check()
+        scan()
 
         time.sleep(60)
 
