@@ -16,35 +16,49 @@ def send_message(text):
     })
 
 
-# ✅ сообщение при запуске
 send_message("🚀 Бот запустился и работает")
 
 
+# 🔥 запасной список
+fallback_symbols = [
+"BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT",
+"ADAUSDT","AVAXUSDT","DOGEUSDT","LINKUSDT","TONUSDT",
+"ARBUSDT","OPUSDT","INJUSDT","APTUSDT","SUIUSDT",
+"SEIUSDT","NEARUSDT","ATOMUSDT","LTCUSDT","ETCUSDT"
+]
+
+
 def get_symbols():
+
     url = "https://api.binance.com/api/v3/exchangeInfo"
 
-    try:
-        response = requests.get(url, timeout=10)
-        data = response.json()
+    for _ in range(3):  # пробуем 3 раза
 
-        if "symbols" not in data:
-            print("Ошибка Binance:", data)
-            return []
+        try:
+            response = requests.get(url, timeout=10)
+            data = response.json()
 
-        symbols = []
+            if "symbols" in data:
 
-        for s in data["symbols"]:
-            if s["quoteAsset"] == "USDT" and s["status"] == "TRADING":
-                symbols.append(s["symbol"])
+                symbols = []
 
-        return symbols
+                for s in data["symbols"]:
+                    if s["quoteAsset"] == "USDT" and s["status"] == "TRADING":
+                        symbols.append(s["symbol"])
 
-    except Exception as e:
-        print("Ошибка получения списка монет:", e)
-        return []
+                return symbols
+
+        except:
+            pass
+
+        time.sleep(2)
+
+    print("Используем fallback список")
+    return fallback_symbols
 
 
 def get_rsi(symbol):
+
     try:
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit=100"
         data = requests.get(url, timeout=10).json()
@@ -65,10 +79,9 @@ def get_rsi(symbol):
 
         rsi = 100 - (100 / (1 + rs))
 
-        return rsi.iloc[-2]  # закрытая свеча
+        return rsi.iloc[-2]
 
-    except Exception as e:
-        print(f"Ошибка RSI {symbol}:", e)
+    except:
         return None
 
 
@@ -78,10 +91,6 @@ def scan():
     send_message("🔄 Бот делает скан рынка")
 
     symbols = get_symbols()
-
-    if not symbols:
-        send_message("⚠️ Не удалось получить список монет")
-        return
 
     oversold = []
     overbought = []
@@ -131,6 +140,6 @@ while True:
         time.sleep(20)
 
     except Exception as e:
-        print("Глобальная ошибка:", e)
-        send_message("❌ Ошибка в работе бота")
+        print("Ошибка:", e)
+        send_message("❌ Ошибка бота")
         time.sleep(60)
