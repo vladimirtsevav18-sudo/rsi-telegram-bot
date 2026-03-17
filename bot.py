@@ -16,8 +16,11 @@ def send_message(text):
     })
 
 
-def get_symbols():
+# ✅ сообщение при запуске
+send_message("🚀 Бот запустился и работает")
 
+
+def get_symbols():
     url = "https://api.binance.com/api/v3/exchangeInfo"
 
     try:
@@ -42,7 +45,6 @@ def get_symbols():
 
 
 def get_rsi(symbol):
-
     try:
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit=100"
         data = requests.get(url, timeout=10).json()
@@ -73,11 +75,12 @@ def get_rsi(symbol):
 def scan():
 
     print("Сканируем рынок...")
+    send_message("🔄 Бот делает скан рынка")
 
     symbols = get_symbols()
 
     if not symbols:
-        print("Нет списка монет, пропускаем")
+        send_message("⚠️ Не удалось получить список монет")
         return
 
     oversold = []
@@ -96,11 +99,7 @@ def scan():
         if rsi >= 70:
             overbought.append(f"{symbol} ({round(rsi,1)})")
 
-        time.sleep(0.1)  # защита от перегрузки API
-
-    if not oversold and not overbought:
-        print("Сигналов нет")
-        return
+        time.sleep(0.1)
 
     message = "📊 RSI сканер рынка\n\n"
 
@@ -112,6 +111,9 @@ def scan():
     if overbought:
         message += "🔴 Перекупленность\n"
         message += "\n".join(overbought[:20])
+
+    if not oversold and not overbought:
+        message += "❗️Сигналов нет"
 
     send_message(message)
 
@@ -130,4 +132,5 @@ while True:
 
     except Exception as e:
         print("Глобальная ошибка:", e)
+        send_message("❌ Ошибка в работе бота")
         time.sleep(60)
