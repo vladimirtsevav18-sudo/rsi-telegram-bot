@@ -237,10 +237,21 @@ def build_messages(signals: list[dict[str, Any]], config: Config, skipped: list[
 def telegram_call(token: str, method: str, data: dict[str, Any]) -> dict[str, Any]:
     encoded = urlencode(data).encode("utf-8")
     request = Request(f"{TELEGRAM_URL}/bot{token}/{method}", data=encoded)
-    with urlopen(request, timeout=25) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=25) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            details = json.loads(exc.read().decode("utf-8"))
+            description = str(details.get("description", "Ответ без описания"))
+        except (ValueError, UnicodeError):
+            description = "Ответ не в формате Telegram JSON"
+        for secret in (token, os.getenv("CMC_API_KEY", "")):
+            if secret:
+                description = description.replace(secret, "[REDACTED]")
+        raise RuntimeError(f"Telegram {method}: HTTP {exc.code}: {description[:400]}") from None
     if not payload.get("ok"):
-        raise RuntimeError(payload.get("description", "Ошибка Telegram"))
+        raise RuntimeError("Ошибка Telegram: " + str(payload.get("error_code", "unknown")))
     return payload
 
 
