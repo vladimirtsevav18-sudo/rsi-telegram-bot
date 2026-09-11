@@ -44,8 +44,8 @@ class Config:
     telegram_chat_id: str
     min_volume_usd: float = 20_000_000
     rsi_period: int = 14
-    rsi_low: float = 35
-    rsi_high: float = 65
+    rsi_low: float = 30
+    rsi_high: float = 70
     top_n: int = 100
     request_pause: float = 0.07
 
@@ -64,8 +64,8 @@ class Config:
             telegram_chat_id=os.environ["TELEGRAM_CHAT_ID"],
             min_volume_usd=float(os.getenv("MIN_VOLUME_USD", "20000000")),
             rsi_period=int(os.getenv("RSI_PERIOD", "14")),
-            rsi_low=float(os.getenv("RSI_LOW", "35")),
-            rsi_high=float(os.getenv("RSI_HIGH", "65")),
+            rsi_low=float(os.getenv("RSI_LOW", "30")),
+            rsi_high=float(os.getenv("RSI_HIGH", "70")),
             top_n=int(os.getenv("TOP_N", "100")),
             request_pause=float(os.getenv("REQUEST_PAUSE", "0.07")),
         )
@@ -186,7 +186,7 @@ def scan(config: Config) -> tuple[list[dict[str, Any]], list[str]]:
         try:
             value = wilder_rsi(get_closed_hourly_closes(pair, cutoff=cutoff), config.rsi_period)
             checked += 1
-            if value < config.rsi_low or value > config.rsi_high:
+            if value <= config.rsi_low or value >= config.rsi_high:
                 signals.append({**coin, "pair": pair, "rsi": value})
         except Exception as exc:  # One missing market must not abort the hourly scan.
             errors += 1
@@ -215,10 +215,10 @@ def build_messages(signals: list[dict[str, Any]], config: Config, skipped: list[
         f"{stamp}\n"
     )
     if not signals:
-        return [header + f"\nСреди проверенных монет сигналов RSI &lt; {config.rsi_low:g} или RSI &gt; {config.rsi_high:g} нет.\nПропущено без пары/данных: {len(skipped)}.\nИсточник свечей: Bybit Spot."]
+        return [header + f"\nСреди проверенных монет сигналов RSI ≤ {config.rsi_low:g} или RSI ≥ {config.rsi_high:g} нет.\nПропущено без пары/данных: {len(skipped)}.\nИсточник свечей: Bybit Spot."]
     lines = []
     for item in signals:
-        marker = "🔻" if item["rsi"] < config.rsi_low else "🔺"
+        marker = "🔻" if item["rsi"] <= config.rsi_low else "🔺"
         lines.append(
             f"{marker} <b>{html.escape(item['symbol'])}</b> — RSI {item['rsi']:.2f} "
             f"· #{item['rank']} · {format_volume(item['volume'])}"
