@@ -255,14 +255,45 @@ def telegram_call(token: str, method: str, data: dict[str, Any]) -> dict[str, An
     return payload
 
 
+def delivery_targets(config: Config) -> list[dict[str, Any]]:
+    targets = [{"chat_id": config.telegram_chat_id}]
+    extras = json.loads(os.getenv("TELEGRAM_EXTRA_TARGETS", "[]"))
+    if not isinstance(extras, list):
+        raise ValueError("TELEGRAM_EXTRA_TARGETS должен быть списком")
+    for target in extras:
+        if not isinstance(target, dict) or not target.get("chat_id"):
+            raise ValueError("Не указан chat_id получателя")
+        item = {"chat_id": str(target["chat_id"])}
+        if "message_thread_id" in target:
+            thread = target["message_thread_id"]
+            if type(thread) is not int or thread <= 0:
+                raise ValueError("Некорректный ID темы")
+            item["message_thread_id"] = thread
+        if item not in targets:
+            targets.append(item)
+    return targets
+
+
 def send_messages(config: Config, messages: list[str]) -> None:
-    for message in messages:
-        telegram_call(config.telegram_bot_token, "sendMessage", {
-            "chat_id": config.telegram_chat_id,
-            "text": message,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": "true",
-        })
+    failed = 0
+    targets = delivery_targets(config)
+    for target in targets:
+        try:
+            for message in messages:
+                telegram_call(config.telegram_bot_token, "sendMessage", {
+                    **target,
+                    "text": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": "true",
+                })
+            logging.info("Доставка успешна: chat_id=%s, тема=%s, сообщений=%d",
+                         target["chat_id"], target.get("message_thread_id", "нет"), len(messages))
+        except Exception as exc:
+            failed += 1
+            logging.error("Ошибка доставки: chat_id=%s, тема=%s: %s",
+                          target["chat_id"], target.get("message_thread_id", "нет"), exc)
+    if failed:
+        raise RuntimeError(f"Не доставлено получателям: {failed} из {len(targets)}")
 
 
 def run_once(config: Config, send: bool = True) -> list[dict[str, Any]]:
